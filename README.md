@@ -16,7 +16,7 @@ HOW TO USE:
  SSO.GoToAccessURL := Proc;
 ```
 
-Where Proc is: (for WebView login)
+Where Proc is: (for WebView login, strongly suggested)
 
 ```
 procedure TfrmLogInSSO.ViewGoToWindow(AUrl: string);
@@ -33,7 +33,7 @@ begin
 end;
 ```
 
-(For Browser login):
+(For Browser login, use only if needed):
 
 ```
 procedure TfrmLogInSSO.ViewGoToURL(AUrl: String);
