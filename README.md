@@ -4,7 +4,14 @@ Sample code for Microsoft SSO-Login
 
 HOW TO USE:
 
-1. Create an object:
+1. Import the libraries(remember to import also the webview class in your project):
+
+```
+uses
+  LoginSSO.Logic, LoginSSO.User.Information, LoginSSO.WebView, LoginSSO.Messages, LoginSSO.Constants;
+```
+
+2. Create an object:
 
 ```
  SSO := TmicrosoftSSO.create(CLIENTID, TENANTID);
@@ -16,7 +23,7 @@ HOW TO USE:
  SSO.GoToAccessURL := Proc;
 ```
 
-Where Proc is: (for WebView login, strongly suggested)
+3.1. Where Proc is: (for WebView login, strongly suggested, remember to also import the webview class into your project)
 
 ```
 procedure TfrmLogInSSO.ViewGoToWindow(AUrl: string);
@@ -33,7 +40,7 @@ begin
 end;
 ```
 
-(For Browser login, use only if needed):
+3.2. (For Browser login, use only if needed):
 
 ```
 procedure TfrmLogInSSO.ViewGoToURL(AUrl: String);
@@ -44,7 +51,7 @@ begin
 end;
 ```
 
-3. Call LogIn function which returns an object(TSSOUserInformationModel) containing User Info:
+4. Call LogIn function which returns an object(TSSOUserInformationModel) containing User Info:
 
 ```
 UserInfo: TSSOUserInformationModel;
