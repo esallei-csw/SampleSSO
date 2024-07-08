@@ -20,7 +20,6 @@ const
 
   DEFAULT_TENANTID = '118d45a5-45c3-4f98-b3e1-5a7b1447c019';
   DEFAULT_CLIENTID = '63816ab1-5e2c-475a-81c4-833249fa7e63';
-  DEFAULT_CLIENTSECRET = 'aej8Q~5htlagKZ.aifYTyGelH-B7~FU.iCLUsdqx';
   DEFAULT_REDIRECTURI = 'http://localhost:8080/callback';
   STD_REDIRECTURI = 'http://localhost:%d/callback';
   CALLBACK = '/callback';
