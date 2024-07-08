@@ -1,0 +1,63 @@
+unit LoginSSO.WebView;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.OleCtrls, SHDocVw, WebView2,
+  Winapi.ActiveX, Vcl.Edge, Vcl.ExtCtrls, Vcl.StdCtrls;
+
+type
+  TWebViewForm = class(TForm)
+    WebBrowser: TEdgeBrowser;
+    procedure FormCreate(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
+    procedure WebBrowserNavigationStarting(Sender: TCustomEdgeBrowser;
+      Args: TNavigationStartingEventArgs);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+    procedure LoadURL(const AURL: string);
+    procedure InjectJavascript;
+  end;
+
+implementation
+
+uses
+  LoginSSO.Constants;
+
+{$R *.dfm}
+
+procedure TWebViewForm.Button1Click(Sender: TObject);
+begin
+  showmessage(WebBrowser.LocationURL);
+end;
+
+procedure TWebViewForm.FormCreate(Sender: TObject);
+begin
+  WebBrowser.Navigate('about:blank');
+end;
+procedure TWebViewForm.LoadURL(const AURL: string);
+begin
+  WebBrowser.Navigate(AURL);
+
+end;
+
+procedure TWebViewForm.WebBrowserNavigationStarting(Sender: TCustomEdgeBrowser;
+  Args: TNavigationStartingEventArgs);
+var
+  LURL: PChar;
+begin
+  Args.ArgsInterface.Get_uri(LURL);
+  if ( Pos(DEFAULT_REDIRECTURI, LURL) > 0 ) then
+    Close;
+
+end;
+
+procedure TWebViewForm.InjectJavaScript;
+begin
+  WebBrowser.ExecuteScript(JAVASCRIPT);
+end;
+
+end.

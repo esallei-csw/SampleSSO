@@ -1,0 +1,27 @@
+unit LoginSSO.Versioning;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls;
+
+type
+  TfrmVersioning = class(TForm)
+    edtQuery: TEdit;
+    btnSaveQuery: TButton;
+    btnExecuteQueries: TButton;
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  frmVersioning: TfrmVersioning;
+
+implementation
+
+{$R *.dfm}
+
+end.

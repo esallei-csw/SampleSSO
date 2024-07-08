@@ -1,0 +1,251 @@
+﻿unit LoginSSO.main;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
+  LoginSSO.Logic, IdBaseComponent, IdComponent, IdCustomTCPServer,
+  IdCustomHTTPServer, IdHTTPServer, LoginSSO.User.Information
+  , LoginSSO.WebView, LoginSSO.Versioning;
+
+type
+  TfrmLogInSSO = class(TForm)
+    btnLogIn: TButton;
+    lblTenentID: TLabel;
+    edtTenentID: TEdit;
+    lblClientID: TLabel;
+    edtClientID: TEdit;
+    lblredirecturi: TLabel;
+    edtredirecturi: TEdit;
+    lblauthcode: TLabel;
+    edtAuthCode: TEdit;
+    lblAccessToken: TLabel;
+    edtAccessToken: TEdit;
+    btnGetToken: TButton;
+    lblDisplayName: TLabel;
+    btnGetUserData: TButton;
+    edtEmail: TEdit;
+    edtDisplayName: TEdit;
+    lblEmail: TLabel;
+    btnLogOut: TButton;
+    btnFullLogIn: TButton;
+    btnWebView: TButton;
+    btnWebViewLogout: TButton;
+
+    procedure btnLogInClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure btnGetTokenClick(Sender: TObject);
+    procedure btnGetUserDataClick(Sender: TObject);
+    procedure btnLogOutClick(Sender: TObject);
+    procedure btnFullLogInClick(Sender: TObject);
+    procedure btnWebViewClick(Sender: TObject);
+    procedure btnWebViewLogoutClick(Sender: TObject);
+  private
+    FSSO: TMicrosoftSSO;
+    FWebForm : TfrmWebViewLogin;
+    FVersioningForm: TfrmVersioning;
+    FUserInfo: TSSOUserInformationModel;
+
+    procedure OpenVersioningForm;
+
+    procedure ViewGoToURL(AUrl: String);
+    procedure ViewGoToWindow(AUrl: string);
+    procedure LogIn(AProc: TGoToAccessURL);
+    procedure LogOut(AProc: TGoToAccessURL);
+
+    function GetSSO: TMicrosoftSSO;
+    property SSO: TMicrosoftSSO read GetSSO;
+
+    function GetWebForm: TfrmWebViewLogin;
+    property WebForm: TfrmWebViewLogin read GetWebForm write FWebForm;
+
+    function GetVersioningForm: TfrmVersioning;
+    property VersioningForm: TfrmVersioning read GetVersioningForm write FVersioningForm;
+
+    function GetUserInfo: TSSOUserInformationModel;
+    property UserInfo: TSSOUserInformationModel read GetUserInfo write FUserInfo;
+
+  public
+    { Public declarations }
+  end;
+
+var
+  frmLogInSSO: TfrmLogInSSO;
+
+implementation
+
+uses
+  Winapi.ShellAPI
+  , LoginSSO.Constants
+  , LoginSSO.Messages;
+
+{$R *.dfm}
+
+
+procedure TfrmLogInSSO.FormCreate(Sender: TObject);
+begin
+  FSSO := nil;
+  FWebForm := nil;
+
+  edtTenentID.Text := DEFAULT_TENANTID;
+  edtClientID.Text := DEFAULT_CLIENTID;
+
+end;
+
+procedure TfrmLogInSSO.FormDestroy(Sender: TObject);
+begin
+  if Assigned(FWebForm) then
+    FWebForm.Free;
+  if Assigned(FSSO) then
+    FSSO.Free;
+  if Assigned(FVersioningForm) then
+    FVersioningForm.Free;
+  if Assigned(FUserInfo) then
+    FUserInfo.Free;
+end;
+
+function TfrmLogInSSO.GetSSO: TMicrosoftSSO;
+begin
+  if ( not Assigned(FSSO) ) then
+    FSSO := TMicrosoftSSO.Create(edtClientID.Text, edtTenentID.Text);
+  Result := FSSO;
+end;
+
+function TfrmLogInSSO.GetUserInfo: TSSOUserInformationModel;
+begin
+  if not Assigned(FUserInfo) then
+    FUserInfo := TSSOUserInformationModel.Create;
+  Result := FUserInfo;
+end;
+
+function TfrmLogInSSO.GetVersioningForm: TfrmVersioning;
+begin
+  if not Assigned(FVersioningForm) then
+    FVersioningForm := TfrmVersioning.Create(nil);
+  Result := FVersioningForm;
+end;
+
+function TfrmLogInSSO.GetWebForm: TfrmWebViewLogin;
+begin
+  if not Assigned(FWebForm) then
+    FWebForm := TfrmWebViewLogin.Create(nil);
+  Result := FWebForm;
+end;
+
+procedure TfrmLogInSSO.LogIn(AProc: TGoToAccessURL);
+begin
+
+  SSO.GoToAccessURL := AProc;
+  UserInfo := SSO.LogIn;
+  if ( not Assigned(UserInfo) ) then
+    Exit;
+
+  edtredirecturi.Text := SSO.GetRedirectURI;
+  edtDisplayName.Text := UserInfo.DisplayName;
+  edtEmail.Text := UserInfo.Email;
+
+  OpenVersioningForm;
+  //quando viene chiuso -> invalid pointer exception...
+//  self.close;
+end;
+
+procedure TfrmLogInSSO.LogOut(AProc: TGoToAccessURL);
+begin
+
+  SSO.GoToAccessURL := AProc;
+  SSO.LogOut;
+
+  edtDisplayName.Clear;
+  edtEmail.Clear;
+  edtAuthCode.Clear;
+  edtAccessToken.Clear;
+end;
+
+procedure TfrmLogInSSO.OpenVersioningForm;
+begin
+  Application.CreateForm(TfrmVersioning, FVersioningForm);
+  FVersioningForm.SetUserInfo(UserInfo);
+  FVersioningForm.Show;
+end;
+
+procedure TfrmLogInSSO.ViewGoToURL(AUrl: String);
+begin
+  ShellExecute(0, OPEN, PChar(AURL), nil, nil, SW_SHOWNORMAL);
+  while SSO.GetAuthCode = EmptyStr do
+    sleep(DEFAULT_SLEEP_TIME);
+end;
+
+procedure TfrmLogInSSO.ViewGoToWindow(AUrl: string);
+begin
+  WebForm.LoadURL(AUrl, SSO.GetRedirectURI);
+  if AUrl.contains(LOGOUT_URL) then
+    WebForm.OperationType := ovtLogOut
+  else
+    WebForm.OperationType := ovtLogIn;
+
+  if ( WebForm.ShowModal <> mrOK ) then
+    raise Exception.Create(LOGIN_CANCEL);
+
+end;
+
+procedure TfrmLogInSSO.btnLogInClick(Sender: TObject);
+begin
+  SSO.GoToAccessURL := ViewGoToWindow;
+  SSO.OpenBrowser(SSO.GetAuthURL);
+  edtAuthCode.Text := SSO.GetAuthCode;
+  SSO.LoggedIn := true;
+end;
+
+procedure TfrmLogInSSO.btnLogOutClick(Sender: TObject);
+begin
+  LogOut(ViewGoToURL);
+end;
+
+procedure TfrmLogInSSO.btnWebViewClick(Sender: TObject);
+begin
+  LogIn(ViewGoToWindow);
+end;
+
+procedure TfrmLogInSSO.btnWebViewLogoutClick(Sender: TObject);
+begin
+  LogOut(ViewGoToWindow);
+end;
+
+procedure TfrmLogInSSO.btnFullLogInClick(Sender: TObject);
+begin
+  LogIn(ViewGoToURL)
+end;
+
+procedure TfrmLogInSSO.btnGetTokenClick(Sender: TObject);
+begin
+  if edtAuthCode.Text <> EmptyStr then
+  begin
+     edtAccessToken.Text := SSO.GetAccessToken;
+  end
+  else
+    ShowMessage(AUTH_CODE_NOT_RECEIVED_MSG);
+end;
+
+procedure TfrmLogInSSO.btnGetUserDataClick(Sender: TObject);
+var
+  LUserData : TSSOUserInformationModel;
+begin
+  try
+    if edtAccessToken.Text <> EmptyStr then
+    begin
+      LUserData := SSO.GetUserData;
+
+      edtDisplayName.Text := LUserData.DisplayName;
+      edtEmail.Text := LUserData.Email;
+    end
+    else
+      ShowMessage(ACCESS_TOKEN_NOT_RECEIVED_MSG);
+
+  except on e:exception do
+    ShowMessage(Format(RS_ERROR_Generic, [e.Message]));
+  end;
+end;
+
+end.

@@ -1,0 +1,23 @@
+unit LoginSSO.Messages;
+
+interface
+
+resourcestring
+  //Errors
+  RS_ERROR_Generic = 'Errore generico: %s';
+  UNSUPPORTED_METHOD_ERROR = 'Unsupported method: %s';
+  JSON_PARSE_ERROR = 'Failed to parse JSON Response';
+
+  NOT_FOUND = 'Not found';
+
+  ACCESS_TOKEN_NOT_RECEIVED_MSG = 'Access Token not received yet.';
+  AUTH_CODE_NOT_RECEIVED_MSG = 'Authorization code not received yet.';
+
+  //Messages
+
+  AUTHCODE_RECEIVED_MSG = 'Authorization code received. You can close this window.';
+
+
+implementation
+
+end.

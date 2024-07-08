@@ -1,0 +1,41 @@
+unit LoginSSO.Utils;
+
+interface
+
+uses
+  System.SysUtils;
+
+type
+  TSSOUtils = class
+
+  private
+
+  public
+    procedure Delay(dwMilliseconds: Longint);
+    function GetEncoding: TEncoding;
+  end;
+
+implementation
+
+uses
+  Winapi.Windows, Winapi.Messages, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms;
+
+procedure TSSOUtils.Delay(dwMilliseconds: Longint);
+var
+  iStart, iStop: DWORD;
+begin
+  iStart := GetTickCount;
+  repeat
+    iStop := GetTickCount;
+    Application.ProcessMessages;
+    Sleep(1);
+  until (iStop - iStart) >= dwMilliseconds;
+end;
+
+function TSSOUtils.GetEncoding: TEncoding;
+begin
+  Result := TEncoding.UTF8;
+end;
+
+end.

@@ -1,0 +1,322 @@
+unit LoginSSO.HTTPRequests;
+
+interface
+
+uses
+  System.Net.HttpClient, System.Net.URLClient, LoginSSO.User.Information, System.Net.HttpClientComponent, Classes
+  , LoginSSO.Utils, LoginSSO.ServerLogic;
+
+type
+  TSSOHTTPRequests = class
+
+  private
+    { Private declarations }
+    FClientID: string;
+    FTenantID: string;
+
+    FAccessToken: string;
+    FRefreshToken: string;
+
+    FUtils : TSSOUtils;
+
+
+    function ExecuteRequest(const AURL: string; const AParams: string; const AMethod: string; const AHeaders: TNetHeaders): IHTTPResponse;
+    function ExecuteHTTPRequest(AHTTPRequest: TNetHTTPRequest; const AURL: string; const AParams: TStringStream; const AMethod: string; const AHeaders: TNetHeaders): IHTTPResponse;
+    function CreateHTTPComponents(out AHTTPClient: TNetHTTPClient; out AHTTPRequest: TNetHTTPRequest): TNetHTTPRequest;
+
+    function ResponseContentUserData(AAccessToken: string): IHTTPResponse;
+    function ResponseContentAccessToken(AAuthCode, ARedirectURI: string): IHTTPResponse;
+    function ParseJsonResponseUserData(AResponseContent: string): TSSOUserInformationModel;
+    function ParseJsonResponseAccessToken(AResponseContent: string): string;
+    function ParseJsonErrorAccessToken(AResponse: string): string;
+    function ParseJsonErrorUserData(AResponse: string): string;
+
+    procedure GetTokens(AAuthCode, ARedirectURI: string);
+
+
+
+    function GetUtils: TSSOUtils;
+    property Utils: TSSOUtils read GetUtils write FUtils;
+  public
+    { Public declarations }
+    constructor Create(AClientID, ATenantID: string);
+    Destructor Destroy; override;
+
+    procedure InvalidateTokens;
+
+    function GetRefreshToken(AAuthCode, ARedirectURI: string): string;
+    function GetAccessToken(AAuthCode, ARedirectURI: string): string;
+
+    function GetUserData(AAccessToken: string): TSSOUserInformationModel;
+
+  end;
+
+
+implementation
+
+uses
+  LoginSSO.Constants, SysUtils, LoginSSO.Messages, System.JSON, System.NetEncoding;
+
+{ TSSOHTTPRequests }
+
+constructor TSSOHTTPRequests.Create(AClientID, ATenantID: string);
+begin
+  FClientID := AClientID;
+  FTenantID := ATenantID;
+
+end;
+
+function TSSOHTTPRequests.CreateHTTPComponents(out AHTTPClient: TNetHTTPClient;
+  out AHTTPRequest: TNetHTTPRequest): TNetHTTPRequest;
+begin
+  AHTTPClient := TNetHTTPClient.Create(nil);
+  AHTTPRequest := TNetHTTPRequest.Create(nil);
+  AHTTPRequest.Client := AHTTPClient;
+  Result := AHTTPRequest;
+end;
+
+destructor TSSOHTTPRequests.Destroy;
+begin
+  if Assigned(FUtils) then
+    FUtils.Free;
+  inherited;
+end;
+
+function TSSOHTTPRequests.ExecuteHTTPRequest(AHTTPRequest: TNetHTTPRequest;
+  const AURL: string; const AParams: TStringStream; const AMethod: string;
+  const AHeaders: TNetHeaders): IHTTPResponse;
+begin
+  if AMethod = POST then
+  begin
+    Result := AHTTPRequest.Post(AURL, AParams, nil, AHeaders);
+  end
+  else if AMethod = GET then
+  begin
+    Result := AHTTPRequest.Get(AURL, nil, AHeaders);
+  end
+  else
+  begin
+    raise Exception.Create(Format(UNSUPPORTED_METHOD_ERROR, [AMethod]));
+  end;
+end;
+
+function TSSOHTTPRequests.ExecuteRequest(const AURL, AParams, AMethod: string;
+  const AHeaders: TNetHeaders): IHTTPResponse;
+var
+  LHTTPClient: TNetHTTPClient;
+  LHTTPRequest: TNetHTTPRequest;
+  LParams: TStringStream;
+begin
+  Result := nil;
+  CreateHTTPComponents(LHTTPClient, LHTTPRequest);
+  try
+    if AMethod = POST then
+      LParams := TStringStream.Create(AParams, Utils.GetEncoding)
+    else
+      LParams := nil;
+
+    try
+      Result := ExecuteHTTPRequest(LHTTPRequest, AURL, LParams, AMethod, AHeaders);
+    finally
+      if Assigned(LParams) then
+        LParams.Free;
+    end;
+  finally
+    LHTTPRequest.Free;
+    LHTTPClient.Free;
+  end;
+end;
+
+function TSSOHTTPRequests.GetAccessToken(AAuthCode, ARedirectURI: string): string;
+begin
+  if FAccessToken = EmptyStr then
+    GetTokens(AAuthCode, ARedirectURI);
+  Result := FAccessToken;
+end;
+
+function TSSOHTTPRequests.GetRefreshToken(AAuthCode, ARedirectURI: string): string;
+begin
+  if FRefreshToken = EmptyStr then
+    GetTokens(AAuthCode, ARedirectURI);
+  Result := FRefreshToken;
+end;
+
+procedure TSSOHTTPRequests.GetTokens(AAuthCode, ARedirectURI: string);
+var
+  LResponse: IHTTPResponse;
+begin
+
+  LResponse := ResponseContentAccessToken(AAuthCode, ARedirectURI);
+  if not Assigned(LResponse) then
+    raise Exception.Create(HTTP_RESPONSE_ERROR);
+  //gestione errori
+  if LResponse.StatusCode <> HTTP_STATUS_OK then
+    raise Exception.Create(ParseJsonErrorAccessToken(LResponse.ContentAsString(Utils.GetEncoding)));
+
+  ParseJsonResponseAccessToken(LResponse.ContentAsString(Utils.GetEncoding));
+end;
+
+function TSSOHTTPRequests.GetUserData(AAccessToken: string): TSSOUserInformationModel;
+var
+  LResponse: IHTTPResponse;
+begin
+  Result := nil;
+
+  LResponse := ResponseContentUserData(AAccessToken);
+  if not Assigned(LResponse) then
+    raise Exception.Create(HTTP_RESPONSE_ERROR);
+  //gestione errori
+  if LResponse.StatusCode <> HTTP_STATUS_OK then
+    raise Exception.Create(ParseJsonErrorUserData(LResponse.ContentAsString(Utils.GetEncoding)));
+
+  Result := ParseJsonResponseUserData(LResponse.ContentAsString(Utils.GetEncoding));
+
+end;
+
+function TSSOHTTPRequests.GetUtils: TSSOUtils;
+begin
+  if not Assigned(FUtils) then
+    FUtils := TSSOUtils.Create;
+  Result:= FUtils;
+end;
+
+procedure TSSOHTTPRequests.InvalidateTokens;
+begin
+  FAccessToken := EmptyStr;
+  FRefreshToken := EmptyStr;
+end;
+
+function TSSOHTTPRequests.ParseJsonErrorAccessToken(AResponse: string): string;
+var
+  LJSONObj: TJSONObject;
+begin
+  LJSONObj := TJSONObject.ParseJSONValue(AResponse) as TJSONObject;
+  if not Assigned(LJSONObj) then
+  begin
+    Result := JSON_PARSE_ERROR;
+    exit;
+  end;
+
+  try
+     Result := LJSONObj.GetValue<string>(ERROR) + ' ' + LJSONObj.GetValue<string>(ERROR_DESCRIPTION);
+  finally
+    LJSONObj.Free;
+  end;
+
+end;
+
+function TSSOHTTPRequests.ParseJsonErrorUserData(AResponse: string): string;
+var
+  LJSONObj: TJSONObject;
+begin
+  LJSONObj := TJSONObject.ParseJSONValue(AResponse) as TJSONObject;
+  if  not Assigned(LJSONObj) then
+  begin
+    Result := JSON_PARSE_ERROR;
+    exit;
+  end;
+
+  try
+    LJSONObj := LJSONObj.GetValue<TJSONObject>(ERROR);
+    if Assigned(LJSONObj) then
+      Result := LJSONObj.GetValue<string>(CODE) + ' ' + LJSONObj.GetValue<string>(MESSAGE);
+
+  finally
+    LJSONObj.Free;
+  end;
+end;
+
+function TSSOHTTPRequests.ParseJsonResponseAccessToken(
+  AResponseContent: string): string;
+var
+  LJSONObj: TJSONObject;
+begin
+  LJSONObj := TJSONObject.ParseJSONValue(AResponseContent) as TJSONObject;
+  try
+    if  not Assigned(LJSONObj) then
+      raise Exception.Create(JSON_PARSE_ERROR);
+    FAccessToken := LJSONObj.GetValue<string>(ACCESS_TOKEN);
+    FRefreshToken := LJSONObj.GetValue<string>(REFRESH_TOKEN);
+    Result := FAccessToken;
+
+  finally
+    LJSONObj.Free;
+  end;
+end;
+
+function TSSOHTTPRequests.ParseJsonResponseUserData(
+  AResponseContent: string): TSSOUserInformationModel;
+var
+  LJSONObj: TJSONObject;
+  LJSONArray: TJSONArray;
+  I: Integer;
+begin
+  // Analizza la risposta JSON
+  LJSONObj := TJSONObject.ParseJSONValue(AResponseContent) as TJSONObject;
+  try
+    if not Assigned(LJSONObj) then
+      raise Exception.Create(JSON_PARSE_ERROR);
+
+    Result := TSSOUserInformationModel.Create;
+
+    // Salvo i valori che mi interessano dal oggetto JSON
+    Result.DisplayName := LJSONObj.GetValue<string>(DISPLAYNAME);
+    Result.GivenName := LJSONObj.GetValue<string>(GIVENNAME);
+    Result.JobTitle := LJSONObj.GetValue<string>(JOBTITLE);
+    Result.EMail := LJSONObj.GetValue<string>(EMAIL);
+    Result.MobilePhone := LJSONObj.GetValue<string>(MOBILEPHONE);
+    Result.OfficeLocation := LJSONObj.GetValue<string>(OFFICELOCATION);
+    Result.PreferredLanguage := LJSONObj.GetValue<string>(PREFERREDLANGUAGE);
+    Result.Surname := LJSONObj.GetValue<string>(SURNAME);
+    Result.UserPrincipalName := LJSONObj.GetValue<string>(USERPRINCIPALNAME);
+    Result.Id := LJSONObj.GetValue<string>(ID);
+
+
+    LJSONArray := LJSONObj.GetValue<TJSONArray>(BUSINESSPHONES);
+
+    if Assigned(LJSONArray) then
+    begin
+      for I := 0 to LJSONArray.Count - 1 do
+      begin
+        Result.BusinessPhones.Add(LJSONArray.Items[I].Value);
+      end;
+    end;
+
+  finally
+    LJSONObj.Free;
+  end;
+end;
+
+function TSSOHTTPRequests.ResponseContentAccessToken(AAuthCode, ARedirectURI: string): IHTTPResponse;
+var
+  LURL: string;
+  LPostData: string;
+begin
+  LURL := DEFAULT_MICROSOFTURL + FTenantID + TOKEN_URL;
+  LPostData := Format(
+    TOKEN_BODY_URL,
+    [TNetEncoding.URL.Encode(FClientID),
+     TNetEncoding.URL.Encode(ARedirectURI),
+     TNetEncoding.URL.Encode(AAuthCode),
+     TNetEncoding.URL.Encode(SCOPE)]
+  );
+
+  Result := ExecuteRequest(LURL, LPostData, POST, []);
+end;
+
+function TSSOHTTPRequests.ResponseContentUserData(AAccessToken: string): IHTTPResponse;
+var
+  LHeader: TNetHeaders;
+begin
+  SetLength(LHeader, 3);
+  LHeader[AUTHORIZATION_NUM].Name := AUTHORIZATION;
+  LHeader[AUTHORIZATION_NUM].Value := BEARER + AAccessToken;
+  LHeader[ACCEPT_NUM].Name := ACCEPT_NAME;
+  LHeader[ACCEPT_NUM].Value := APPLICATION_JSON;
+  LHeader[USER_AGENT_NUM].Name := USER_AGENT;
+  LHeader[USER_AGENT_NUM].Value := MOZILLA_CONST;
+
+  Result := ExecuteRequest(MICROSOFT_GRAPH_URL, EmptyStr, GET, LHeader);
+end;
+
+end.

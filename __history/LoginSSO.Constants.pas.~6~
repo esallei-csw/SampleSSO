@@ -1,0 +1,22 @@
+unit LoginSSO.Constants;
+
+interface
+
+const
+  DEFAULT_PATH = 'C:\Sviluppo\SampleSSO\Certificate';
+
+
+  DEFAULT_AUTHURL = 'https://login.microsoftonline.com/118d45a5-45c3-4f98-b3e1-5a7b1447c019/oauth2/v2.0/authorize';
+  DEFAULT_TOKENURL = 'https://login.microsoftonline.com/118d45a5-45c3-4f98-b3e1-5a7b1447c019/oauth2/v2.0/token';
+
+  DEFAULT_TENENTID = '118d45a5-45c3-4f98-b3e1-5a7b1447c019';
+  DEFAULT_CLIENTID = '63816ab1-5e2c-475a-81c4-833249fa7e63';
+  DEFAULT_CLIENTSECRET = 'aej8Q~5htlagKZ.aifYTyGelH-B7~FU.iCLUsdqx';
+  DEFAULT_REDIRECTURI = 'http://localhost:8080/callback';
+
+
+implementation
+
+
+
+end.

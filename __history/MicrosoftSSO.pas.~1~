@@ -1,0 +1,213 @@
+unit MicrosoftSSO;
+
+interface
+
+uses
+  System.SysUtils, System.Classes, IdHTTPServer, IdCustomHTTPServer, IdContext,
+  System.Net.HttpClient, System.Net.URLClient, System.Net.HttpClientComponent, System.JSON, ;
+
+type
+  TMicrosoftSSO = class
+  private
+    { Private declarations }
+    FHTTPServer: TIdHTTPServer;
+    FClientID: string;
+    FClientSecret: string;
+    FTenantID: string;
+    FRedirectURI: string;
+    FAuthorizationCode: string;
+    FAccessToken: string;
+    procedure HTTPServerCommandGet(AContext: TIdContext; ARequestInfo: TIdHTTPRequestInfo; AResponseInfo: TIdHTTPResponseInfo);
+    procedure RedirectToAuthorizationEndpoint;
+    function GetUserData(dataName :string): string;
+  public
+    { Public declarations }
+    constructor Create(AClientID, AClientSecret, ATenantID, ARedirectURI: string);
+    destructor Destroy; override;
+    procedure StartServer;
+    procedure StopServer;
+    function GetAccessToken: string;
+    function GetDisplayName: string;
+    function GetEmail: string;
+  end;
+
+implementation         ciao
+
+constructor TMicrosoftSSO.Create(AClientID, AClientSecret, ATenantID, ARedirectURI: string);
+begin
+  FClientID := AClientID;
+  FClientSecret := AClientSecret;
+  FTenantID := ATenantID;
+  FRedirectURI := ARedirectURI;
+
+  FHTTPServer := TIdHTTPServer.Create(nil);
+  FHTTPServer.DefaultPort := 8080;
+  FHTTPServer.OnCommandGet := HTTPServerCommandGet;
+end;
+
+destructor TMicrosoftSSO.Destroy;
+begin
+  FHTTPServer.Free;
+  inherited;
+end;
+
+procedure TMicrosoftSSO.StartServer;
+begin
+  FHTTPServer.Active := True;
+  RedirectToAuthorizationEndpoint;
+end;
+
+procedure TMicrosoftSSO.StopServer;
+begin
+  FHTTPServer.Active := False;
+end;
+
+procedure TMicrosoftSSO.HTTPServerCommandGet(AContext: TIdContext; ARequestInfo: TIdHTTPRequestInfo; AResponseInfo: TIdHTTPResponseInfo);
+begin
+  if ARequestInfo.Document = '/callback' then
+  begin
+    FAuthorizationCode := ARequestInfo.Params.Values['code'];
+    AResponseInfo.ContentText := 'Authorization code received. You can close this window.';
+  end
+  else
+  begin
+    AResponseInfo.ResponseNo := 404;
+    AResponseInfo.ContentText := 'Not found';
+  end;
+end;
+
+procedure TMicrosoftSSO.RedirectToAuthorizationEndpoint;
+var
+  AuthURL: string;
+begin
+  AuthURL := Format(
+    'https://login.microsoftonline.com/%s/oauth2/v2.0/authorize?client_id=%s&response_type=code&redirect_uri=%s&response_mode=query&scope=https://graph.microsoft.com/.default',
+    [FTenantID, FClientID, TNetEncoding.URL.Encode(FRedirectURI)]
+  );
+  ShellExecute(0, 'open', PChar(AuthURL), nil, nil, SW_SHOWNORMAL);
+end;
+
+function TMicrosoftSSO.GetAccessToken: string;
+var
+  HTTPClient: TNetHTTPClient;
+  HTTPRequest: TNetHTTPRequest;
+  Response: IHTTPResponse;
+  Params: TStringStream;
+  JSONObj: TJSONObject;
+  ResponseContent: string;
+  PostData: string;
+begin
+  Result := '';
+  HTTPClient := TNetHTTPClient.Create(nil);
+  HTTPRequest := TNetHTTPRequest.Create(nil);
+  try
+    HTTPRequest.Client := HTTPClient;
+
+    // Costruisci i parametri della richiesta nel corpo della richiesta POST
+    PostData := Format(
+      'client_id=%s&redirect_uri=%s&grant_type=authorization_code&code=%s',
+      [TNetEncoding.URL.Encode(FClientID),
+       TNetEncoding.URL.Encode(FRedirectURI),
+       TNetEncoding.URL.Encode(FAuthorizationCode)]
+    );
+    Params := TStringStream.Create(PostData, TEncoding.UTF8);
+
+    // Imposta il tipo di contenuto della richiesta
+    HTTPRequest.ContentType := 'application/x-www-form-urlencoded';
+
+    // Effettua la richiesta POST
+    Response := HTTPRequest.Post('https://login.microsoftonline.com/' + FTenantID + '/oauth2/v2.0/token', Params);
+
+    // Leggi la risposta
+    ResponseContent := Response.ContentAsString(TEncoding.UTF8);
+    ShowMessage('Response: ' + ResponseContent); // Log per debug
+
+    // Analizza la risposta JSON
+    JSONObj := TJSONObject.ParseJSONValue(ResponseContent) as TJSONObject;
+    try
+      if Assigned(JSONObj) then
+      begin
+        FAccessToken := JSONObj.GetValue<string>('access_token');
+        Result := FAccessToken;
+      end
+      else
+      begin
+        ShowMessage('Failed to parse JSON response');
+      end;
+    finally
+      JSONObj.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      ShowMessage('Error: ' + E.Message);
+    end;
+  end;
+
+  HTTPRequest.Free;
+  HTTPClient.Free;
+  Params.Free;
+end;
+
+function TMicrosoftSSO.GetUserData(dataName :string): string;
+var
+  HTTPClient: TNetHTTPClient;
+  HTTPRequest: TNetHTTPRequest;
+  Response: IHTTPResponse;
+  JSONObj: TJSONObject;
+  ResponseContent: string;
+  UserData: string;
+begin
+  Result := '';
+  HTTPClient := TNetHTTPClient.Create(nil);
+  HTTPRequest := TNetHTTPRequest.Create(nil);
+  try
+    HTTPRequest.Client := HTTPClient;
+    HTTPRequest.CustomHeaders['Authorization'] := 'Bearer ' + FAccessToken;
+    HTTPRequest.CustomHeaders['Accept'] := 'application/json';
+    HTTPRequest.CustomHeaders['User-Agent'] := 'Mozilla/5.0 (compatible; DelphiClient/1.0)';
+
+    // Effettua la richiesta GET
+    Response := HTTPRequest.Get('https://graph.microsoft.com/v1.0/me');
+
+    // Leggi la risposta
+    ResponseContent := Response.ContentAsString(TEncoding.UTF8);
+    ShowMessage('Response: ' + ResponseContent); // Log per debug
+
+    // Analizza la risposta JSON
+    JSONObj := TJSONObject.ParseJSONValue(ResponseContent) as TJSONObject;
+    try
+      if Assigned(JSONObj) then
+      begin
+        // Supponiamo di voler ottenere il displayName dell'utente
+        Result := JSONObj.GetValue<string>(dataName);
+      end
+      else
+      begin
+        ShowMessage('Failed to parse JSON response');
+      end;
+    finally
+      JSONObj.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      ShowMessage('Error: ' + E.Message);
+    end;
+  end;
+
+  HTTPRequest.Free;
+  HTTPClient.Free;
+end;
+
+function TMicrosoftSSO.GetDisplayName: string;
+begin
+  Result := GetUserData('displayName');
+end;
+
+function TMicrosoftSSO.GetEmail: string;
+begin
+  Result := GetUserData('email');
+end;
+end.
+

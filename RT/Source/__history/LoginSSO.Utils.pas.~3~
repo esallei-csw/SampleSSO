@@ -1,0 +1,43 @@
+unit LoginSSO.Utils;
+
+interface
+
+uses
+  System.SysUtils;
+
+type
+  TSSOUtils = class
+
+  private
+
+  public
+    procedure Delay(dwMilliseconds: Longint);
+    function GetEncoding: TEncoding;
+  end;
+
+implementation
+
+uses
+  Winapi.Windows, Winapi.Messages, System.Variants, System.Classes;
+
+procedure TSSOUtils.Delay(dwMilliseconds: Longint);
+begin
+//var
+//  iStart, iStop: DWORD;
+//
+//begin
+//  iStart := GetTickCount;
+//  repeat
+//    iStop := GetTickCount;
+//    // ToDo: Gestire ProcessMessage - spostare in vcl o sostituire
+//    // Application.ProcessMessages;
+//    Sleep(1);
+//  until (iStop - iStart) >= dwMilliseconds;
+end;
+
+function TSSOUtils.GetEncoding: TEncoding;
+begin
+  Result := TEncoding.UTF8;
+end;
+
+end.

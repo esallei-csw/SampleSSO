@@ -1,0 +1,444 @@
+unit LoginSSO.Logic;
+
+interface
+
+uses
+  System.SysUtils, System.Classes, IdContext, IdHTTPServer,
+  System.Net.HttpClient, System.Net.URLClient, System.Net.HttpClientComponent
+ , LoginSSO.User.Information, System.JSON, LoginSSO.Utils, LoginSSO.ServerLogic, LoginSSO.HTTPRequests;
+
+type
+  TGoToAccessURL = procedure(AUrl: String) of Object;
+
+  TMicrosoftSSO = class
+  private
+    { Private declarations }
+    FClientID: string;
+    FClientSecret: string;
+    FTenantID: string;
+    FRedirectURI: string;
+    FAuthorizationCode: string;
+    FAccessToken: string;
+    FLoggedIn: boolean;
+    FAuthURL: string;
+    FUtils : TSSOUtils;
+    FGoToAccessURL: TGoToAccessURL;
+    FSSOServer: TSSOServer;
+    FSSOHTTPRequests: TSSOHTTPRequests;
+
+
+//    function ExecuteRequest(const AURL: string; const AParams: string; const AMethod: string; const AHeaders: TNetHeaders): IHTTPResponse;
+//    function ResponseContentUserData: IHTTPResponse;
+//    function ResponseContentAccessToken: IHTTPResponse;
+//    function ParseJsonResponseUserData(AResponseContent: string): TSSOUserInformationModel;
+//    function ParseJsonResponseAccessToken(AResponseContent: string): string;
+//
+//    function CreateHTTPComponents(out AHTTPClient: TNetHTTPClient; out AHTTPRequest: TNetHTTPRequest): TNetHTTPRequest;
+//    function ExecuteHTTPRequest(AHTTPRequest: TNetHTTPRequest; const AURL: string; const AParams: TStringStream; const AMethod: string; const AHeaders: TNetHeaders): IHTTPResponse;
+//
+//    function ParseJsonErrorAccessToken(AResponse: string): string;
+//    function ParseJsonErrorUserData(AResponse: string): string;
+
+    function GetUtils: TSSOUtils;
+    function GetSSOServer: TSSOServer;
+    function GetSSOHTTPReq: TSSOHTTPRequests;
+    procedure InvalidateCodeAndToken;
+    function GetLogoutURL: string;
+
+    property Utils: TSSOUtils read GetUtils write FUtils;
+    property SSOServer: TSSOServer read GetSSOServer write FSSOServer;
+    property SSOHTTPRequests: TSSOHTTPRequests read GetSSOHTTPReq write FSSOHTTPRequests;
+
+
+
+  public
+    { Public declarations }
+    constructor Create(AClientID, ATenantID: string);
+    destructor Destroy; override;
+    function GetAccessToken: string;
+    function GetAuthCode: string;
+    procedure LogOut;
+    function GetUserData: TSSOUserInformationModel;
+    function GetAuthURL: string;
+    procedure OpenBrowser(AURL: string);
+
+    function LogIn: TSSOUserInformationModel;
+
+    function GetRedirectURI: string;
+
+    property LoggedIn : boolean read FLoggedIn write FLoggedIn;
+    property GoToAccessURL: TGoToAccessURL read FGoToAccessURL write FGoToAccessURL;
+  end;
+
+implementation
+
+uses
+ System.NetEncoding, Winapi.Windows
+ , System.IOUtils, LoginSSO.Constants, LoginSSO.Messages, System.Generics.Collections, IdGlobal, IdSocketHandle, IdException;
+
+ { TMicrosoftSSO }
+
+constructor TMicrosoftSSO.Create(AClientID, ATenantID: string);
+begin
+  FGoToAccessURL := nil;
+
+  FClientID := AClientID;
+  FTenantID := ATenantID;
+
+  //creo e avvio il server
+  SSOServer := TSSOServer.create;
+  FRedirectURI := SSOServer.GetRedirectURI;
+
+  FAuthURL := Format(
+    DEFAULT_MICROSOFTURL + AUTH_URL,
+    [FTenantID, FClientID, TNetEncoding.URL.Encode(FRedirectURI)]);
+
+  LoggedIn := false;
+
+end;
+
+destructor TMicrosoftSSO.Destroy;
+begin
+  if Assigned(FUtils) then
+    FUtils.Free;
+  if Assigned(FSSOServer) then
+    FSSOServer.Free;
+  if Assigned(FSSOHTTPRequests) then
+    FSSOHTTPRequests.Free;
+  inherited;
+end;
+
+function TMicrosoftSSO.GetAuthCode: string;
+begin
+  Result := FAuthorizationCode;
+end;
+
+function TMicrosoftSSO.GetAuthURL: string;
+begin
+  Result := FAuthURL;
+end;
+
+function TMicrosoftSSO.GetLogoutURL: string;
+begin
+  Result := Format(DEFAULT_MICROSOFTURL + FTenantID + LOGOUT_URL + POST_REDIRECT_URL, [FRedirectURI]);
+end;
+
+function TMicrosoftSSO.GetRedirectURI: string;
+begin
+  Result := FRedirectURI;
+end;
+
+function TMicrosoftSSO.GetSSOHTTPReq: TSSOHTTPRequests;
+begin
+  if not Assigned(FSSOHTTPRequests) then
+    FSSOHTTPRequests := TSSOHTTPRequests.Create(FClientID, FTenantID);
+  Result := FSSOHTTPRequests;
+end;
+
+function TMicrosoftSSO.GetSSOServer: TSSOServer;
+begin
+  if not Assigned(FSSOServer) then
+    FSSOServer := TSSOServer.Create;
+  Result := FSSOServer;
+end;
+
+procedure TMicrosoftSSO.InvalidateCodeAndToken;
+begin
+  FAuthorizationCode := EmptyStr;
+  FAccessToken := EmptyStr;
+end;
+
+procedure TMicrosoftSSO.OpenBrowser(AURL: string);
+begin
+  if not Assigned(FGoToAccessURL) then
+    raise Exception.Create(METHOD_NOT_IMPLEMENTED);
+
+  FGoToAccessURL(AURL);
+end;
+
+
+//function TMicrosoftSSO.ResponseContentUserData: IHTTPResponse;
+//var
+//  LHeader: TNetHeaders;
+//begin
+//  SetLength(LHeader, 3);
+//  LHeader[AUTHORIZATION_NUM].Name := AUTHORIZATION;
+//  LHeader[AUTHORIZATION_NUM].Value := BEARER + FAccessToken;
+//  LHeader[ACCEPT_NUM].Name := ACCEPT_NAME;
+//  LHeader[ACCEPT_NUM].Value := APPLICATION_JSON;
+//  LHeader[USER_AGENT_NUM].Name := USER_AGENT;
+//  LHeader[USER_AGENT_NUM].Value := MOZILLA_CONST;
+//
+//  Result := ExecuteRequest(MICROSOFT_GRAPH_URL, EmptyStr, GET, LHeader);
+//end;
+
+//function TMicrosoftSSO.ResponseContentAccessToken: IHTTPResponse;
+//var
+//  LURL: string;
+//  LPostData: string;
+//begin
+//
+//  LURL := DEFAULT_MICROSOFTURL + FTenantID + TOKEN_URL;
+//  LPostData := Format(
+//    TOKEN_BODY_URL,
+//    [TNetEncoding.URL.Encode(FClientID),
+//     TNetEncoding.URL.Encode(FRedirectURI),
+//     TNetEncoding.URL.Encode(SSOServer.GetAuthCode)]
+//  );
+//
+//  Result := ExecuteRequest(LURL, LPostData, POST, []);
+//end;
+
+//function TMicrosoftSSO.ParseJsonResponseUserData(AResponseContent: string): TSSOUserInformationModel;
+//var
+//  LJSONObj: TJSONObject;
+//  LJSONArray: TJSONArray;
+//  I: Integer;
+//begin
+//  // Analizza la risposta JSON
+//  LJSONObj := TJSONObject.ParseJSONValue(AResponseContent) as TJSONObject;
+//  try
+//    if not Assigned(LJSONObj) then
+//      raise Exception.Create(JSON_PARSE_ERROR);
+//
+//    Result := TSSOUserInformationModel.Create;
+//
+//    // Salvo i valori che mi interessano dal oggetto JSON
+//    Result.DisplayName := LJSONObj.GetValue<string>(DISPLAYNAME);
+//    Result.GivenName := LJSONObj.GetValue<string>(GIVENNAME);
+//    Result.JobTitle := LJSONObj.GetValue<string>(JOBTITLE);
+//    Result.EMail := LJSONObj.GetValue<string>(EMAIL);
+//    Result.MobilePhone := LJSONObj.GetValue<string>(MOBILEPHONE);
+//    Result.OfficeLocation := LJSONObj.GetValue<string>(OFFICELOCATION);
+//    Result.PreferredLanguage := LJSONObj.GetValue<string>(PREFERREDLANGUAGE);
+//    Result.Surname := LJSONObj.GetValue<string>(SURNAME);
+//    Result.UserPrincipalName := LJSONObj.GetValue<string>(USERPRINCIPALNAME);
+//    Result.Id := LJSONObj.GetValue<string>(ID);
+//
+//
+//    LJSONArray := LJSONObj.GetValue<TJSONArray>(BUSINESSPHONES);
+//
+//    if Assigned(LJSONArray) then
+//    begin
+//      for I := 0 to LJSONArray.Count - 1 do
+//      begin
+//        Result.BusinessPhones.Add(LJSONArray.Items[I].Value);
+//      end;
+//    end;
+//
+//  finally
+//    LJSONObj.Free;
+//  end;
+//end;
+
+//function TMicrosoftSSO.ParseJsonResponseAccessToken(AResponseContent: string): string;
+//var
+//  LJSONObj: TJSONObject;
+//begin
+//  LJSONObj := TJSONObject.ParseJSONValue(AResponseContent) as TJSONObject;
+//  try
+//    if  not Assigned(LJSONObj) then
+//      raise Exception.Create(JSON_PARSE_ERROR);
+//
+//    Result := LJSONObj.GetValue<string>(ACCESS_TOKEN);
+//
+//  finally
+//    LJSONObj.Free;
+//  end;
+//end;
+
+//function TMicrosoftSSO.CreateHTTPComponents(out AHTTPClient: TNetHTTPClient; out AHTTPRequest: TNetHTTPRequest): TNetHTTPRequest;
+//begin
+//  AHTTPClient := TNetHTTPClient.Create(nil);
+//  AHTTPRequest := TNetHTTPRequest.Create(nil);
+//  AHTTPRequest.Client := AHTTPClient;
+//  Result := AHTTPRequest;
+//end;
+
+//function TMicrosoftSSO.ExecuteHTTPRequest(AHTTPRequest: TNetHTTPRequest; const AURL: string; const AParams: TStringStream; const AMethod: string; const AHeaders: TNetHeaders): IHTTPResponse;
+//begin
+//  if AMethod = POST then
+//  begin
+//    Result := AHTTPRequest.Post(AURL, AParams, nil, AHeaders);
+//  end
+//  else if AMethod = GET then
+//  begin
+//    Result := AHTTPRequest.Get(AURL, nil, AHeaders);
+//  end
+//  else
+//  begin
+//    raise Exception.Create(Format(UNSUPPORTED_METHOD_ERROR, [AMethod]));
+//  end;
+//end;
+
+
+
+//function TMicrosoftSSO.ExecuteRequest(const AURL: string; const AParams: string; const AMethod: string; const AHeaders: TNetHeaders): IHTTPResponse;
+//var
+//  LHTTPClient: TNetHTTPClient;
+//  LHTTPRequest: TNetHTTPRequest;
+//  LParams: TStringStream;
+//begin
+//  Result := nil;
+//  CreateHTTPComponents(LHTTPClient, LHTTPRequest);
+//  try
+//    if AMethod = POST then
+//      LParams := TStringStream.Create(AParams, Utils.GetEncoding)
+//    else
+//      LParams := nil;
+//
+//    try
+//      Result := ExecuteHTTPRequest(LHTTPRequest, AURL, LParams, AMethod, AHeaders);
+//    finally
+//      if Assigned(LParams) then
+//        LParams.Free;
+//    end;
+//  finally
+//    LHTTPRequest.Free;
+//    LHTTPClient.Free;
+//  end;
+//end;
+
+//function TMicrosoftSSO.ParseJsonErrorAccessToken(AResponse: string): string;
+//var
+//  LJSONObj: TJSONObject;
+//  LJSONValue: TJSONValue;
+//begin
+//  LJSONValue := TJSONObject.ParseJSONValue(AResponse);
+//  if  not Assigned(LJSONValue) then
+//  begin
+//    Result := JSON_PARSE_ERROR;
+//    exit;
+//  end;
+//
+//  try
+//     LJSONObj := LJSONValue as TJSONObject;
+//     Result := LJSONObj.GetValue<string>(ERROR) + ' ' + LJSONObj.GetValue<string>(ERROR_DESCRIPTION);
+//  finally
+//    LJSONObj.Free;
+//    LJSONValue.Free;
+//  end;
+//
+//end;
+
+//function TMicrosoftSSO.ParseJsonErrorUserData(AResponse: string): string;
+//var
+//  LJSONObj: TJSONObject;
+//begin
+//  LJSONObj := TJSONObject.ParseJSONValue(AResponse) as TJSONObject;
+//  if  not Assigned(LJSONObj) then
+//  begin
+//    Result := JSON_PARSE_ERROR;
+//    exit;
+//  end;
+//
+//  try
+//    LJSONObj := LJSONObj.GetValue<TJSONObject>(ERROR);
+//    if Assigned(LJSONObj) then
+//      Result := LJSONObj.GetValue<string>(CODE) + ' ' + LJSONObj.GetValue<string>(MESSAGE);
+//
+//  finally
+//    LJSONObj.Free;
+//  end;
+//end;
+
+function TMicrosoftSSO.GetAccessToken: string;
+var
+  LResponse: IHTTPResponse;
+begin
+  Result := EmptyStr;
+
+  //old version
+//  LResponse := ResponseContentAccessToken;
+//  if not Assigned(LResponse) then
+//    raise Exception.Create(HTTP_RESPONSE_ERROR);
+//  //gestione errori
+//  if LResponse.StatusCode <> HTTP_STATUS_OK then
+//    raise Exception.Create(ParseJsonErrorAccessToken(LResponse.ContentAsString(Utils.GetEncoding)));
+//
+//  FAccessToken := ParseJsonResponseAccessToken(LResponse.ContentAsString(Utils.GetEncoding));
+//
+//  Result := FAccessToken;
+
+  //new version
+  LResponse := SSOHTTPRequests.ResponseContentAccessToken(SSOServer.AuthCode, FRedirectURI);
+  if not Assigned(LResponse) then
+    raise Exception.Create(HTTP_RESPONSE_ERROR);
+  //gestione errori
+  if LResponse.StatusCode <> HTTP_STATUS_OK then
+    raise Exception.Create(SSOHTTPRequests.ParseJsonErrorAccessToken(LResponse.ContentAsString(Utils.GetEncoding)));
+
+  FAccessToken := SSOHTTPRequests.ParseJsonResponseAccessToken(LResponse.ContentAsString(Utils.GetEncoding));
+
+  Result := FAccessToken;
+end;
+
+function TMicrosoftSSO.GetUserData: TSSOUserInformationModel;
+var
+  LResponse: IHTTPResponse;
+begin
+  Result := nil;
+
+  //old version
+//  LResponse := ResponseContentUserData;
+//  if not Assigned(LResponse) then
+//    raise Exception.Create(HTTP_RESPONSE_ERROR);
+//  //gestione errori
+//  if LResponse.StatusCode <> HTTP_STATUS_OK then
+//    raise Exception.Create(ParseJsonErrorUserData(LResponse.ContentAsString(Utils.GetEncoding)));
+//
+//  Result := ParseJsonResponseUserData(LResponse.ContentAsString(Utils.GetEncoding));
+
+  //new version
+  LResponse := SSOHTTPRequests.ResponseContentUserData(FAccessToken);
+  if not Assigned(LResponse) then
+    raise Exception.Create(HTTP_RESPONSE_ERROR);
+  //gestione errori
+  if LResponse.StatusCode <> HTTP_STATUS_OK then
+    raise Exception.Create(SSOHTTPRequests.ParseJsonErrorUserData(LResponse.ContentAsString(Utils.GetEncoding)));
+
+  Result := SSOHTTPRequests.ParseJsonResponseUserData(LResponse.ContentAsString(Utils.GetEncoding));
+
+end;
+
+function TMicrosoftSSO.GetUtils: TSSOUtils;
+begin
+  if not Assigned(FUtils) then
+    FUtils := TSSOUtils.Create;
+  Result := FUtils;
+end;
+
+procedure TMicrosoftSSO.Logout;
+begin
+  if not LoggedIn then
+    raise Exception.Create(NOT_LOGGED);
+
+  // Redirect to Microsoft's logout URL
+  OpenBrowser(GetLogoutURL);
+
+  //invalidate the auth code and access token
+  InvalidateCodeAndToken;
+
+  LoggedIn := False;
+end;
+
+function TMicrosoftSSO.LogIn: TSSOUserInformationModel;
+begin
+  if LoggedIn then
+    raise Exception.Create(ALREADY_LOGGED);
+  //apro la pagina di autorizzazione
+  OpenBrowser(FAuthURL);
+
+  sleep(DEFAULT_SLEEP_TIME);
+
+  if ( SSOServer.AuthCode = EmptyStr ) then
+    raise Exception.Create(LOGIN_CANCEL);
+  FAccessToken := GetAccessToken;
+  //Ritorno i dati utente prendendoli tramite access token
+  Result := GetUserData;
+
+  LoggedIn := true;
+end;
+
+end.
+

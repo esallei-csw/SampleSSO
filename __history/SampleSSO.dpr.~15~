@@ -1,0 +1,23 @@
+program SampleSSO;
+
+uses
+  Vcl.Forms,
+  LoginSSO.main in 'LoginSSO.main.pas' {Form1},
+  Vcl.Themes,
+  Vcl.Styles,
+  LoginSSO.WebView in 'LoginSSO.WebView.pas' {WebViewForm};
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.MainFormOnTaskbar := True;
+  TStyleManager.TrySetStyle('Windows10 Dark');
+  Application.CreateForm(TForm1, Form1);
+  Application.CreateForm(TWebViewForm, WebViewForm);
+  Application.Run;
+end.
+
+
+
+

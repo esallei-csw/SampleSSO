@@ -1,0 +1,17 @@
+unit LoginSSO.User.Information;
+
+interface
+
+type
+  TSSOUserInformationModel = class
+  private
+    FDisplayName: string;
+    FEmail: string;
+  public
+    property EMail: string read FEmail write FEmail;
+    property DisplayName: string read FDisplayName write FDisplayName;
+  end;
+
+implementation
+
+end.

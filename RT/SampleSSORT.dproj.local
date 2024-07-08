@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2024/06/25 11:24:30.000.744,=rtl.dcp</Transaction>
+    <Transaction>2024/06/25 11:25:28.000.224,C:\Users\esallei\OneDrive - centrosoftware.com\Documenti\Embarcadero\Studio\Projects\Package1.dproj=C:\Sviluppo\SampleSSO\RT\SampleSSORT.dproj</Transaction>
+    <Transaction>2024/06/25 11:27:20.000.854,=C:\Sviluppo\SampleSSO\RT\Source\LoginSSO.Constants.pas</Transaction>
+    <Transaction>2024/06/25 11:27:40.000.310,=C:\Sviluppo\SampleSSO\RT\Source\LoginSSO.Logic.pas</Transaction>
+    <Transaction>2024/06/25 11:27:40.000.363,=C:\Sviluppo\SampleSSO\RT\Source\LoginSSO.User.Information.pas</Transaction>
+    <Transaction>2024/06/25 11:27:40.000.331,=C:\Sviluppo\SampleSSO\RT\Source\LoginSSO.Messages.pas</Transaction>
+    <Transaction>2024/06/25 11:27:40.000.378,=C:\Sviluppo\SampleSSO\RT\Source\LoginSSO.Utils.pas</Transaction>
+    <Transaction>2024/06/25 11:29:30.000.475,=vcl.dcp</Transaction>
+    <Transaction>2024/06/25 11:29:30.000.573,=IndyCore.dcp</Transaction>
+    <Transaction>2024/06/25 11:29:30.000.527,=IndySystem.dcp</Transaction>
+    <Transaction>2024/06/25 11:29:30.000.552,=IndyProtocols.dcp</Transaction>
+    <Transaction>2024/06/25 11:30:03.000.539,=vcl.dcp</Transaction>
+    <Transaction>2024/06/28 09:20:29.000.091,=C:\Sviluppo\SampleSSO\RT\Unit1.pas</Transaction>
+    <Transaction>2024/06/28 09:20:52.000.360,C:\Sviluppo\SampleSSO\RT\LoginSSO.ServerLogic.pas=C:\Sviluppo\SampleSSO\RT\Unit1.pas</Transaction>
+    <Transaction>2024/06/28 09:22:18.000.673,C:\Sviluppo\SampleSSO\RT\Source\LoginSSO.ServerLogic.pas=C:\Sviluppo\SampleSSO\RT\LoginSSO.ServerLogic.pas</Transaction>
+    <Transaction>2024/06/28 12:04:58.000.460,=C:\Sviluppo\SampleSSO\RT\Unit1.pas</Transaction>
+    <Transaction>2024/06/28 12:06:16.000.243,C:\Sviluppo\SampleSSO\RT\Source\LoginSSO.HTTPRequests.pas=C:\Sviluppo\SampleSSO\RT\Unit1.pas</Transaction>
+  </Transactions>
+	<ProjectSortOrder AutoSort="0" SortType="0">
+    <File Path="Source"/>
+    <File Path="Source\LoginSSO.Constants.pas"/>
+    <File Path="Source\LoginSSO.HTTPRequests.pas"/>
+    <File Path="Source\LoginSSO.Logic.pas"/>
+    <File Path="Source\LoginSSO.Messages.pas"/>
+    <File Path="Source\LoginSSO.ServerLogic.pas"/>
+    <File Path="Source\LoginSSO.User.Information.pas"/>
+    <File Path="Source\LoginSSO.Utils.pas"/>
+    <File Path="IndyCore.dcp"/>
+    <File Path="IndyProtocols.dcp"/>
+    <File Path="IndySystem.dcp"/>
+    <File Path="rtl.dcp"/>
+  </ProjectSortOrder>
+</BorlandProject>

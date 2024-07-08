@@ -1,0 +1,72 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{C0D91B55-3E13-47D7-9055-760C62A06FCC}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="RT\SampleSSORT.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="SampleSSO.dproj">
+            <Dependencies>RT\SampleSSORT.dproj</Dependencies>
+        </Projects>
+        <Projects Include="..\Versioning\RT\VersioningRT.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="..\Versioning\prj\Source\Versioning.dproj">
+            <Dependencies>..\Versioning\RT\VersioningRT.dproj</Dependencies>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="SampleSSORT">
+        <MSBuild Projects="RT\SampleSSORT.dproj"/>
+    </Target>
+    <Target Name="SampleSSORT:Clean">
+        <MSBuild Projects="RT\SampleSSORT.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="SampleSSORT:Make">
+        <MSBuild Projects="RT\SampleSSORT.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="SampleSSO" DependsOnTargets="SampleSSORT">
+        <MSBuild Projects="SampleSSO.dproj"/>
+    </Target>
+    <Target Name="SampleSSO:Clean" DependsOnTargets="SampleSSORT:Clean">
+        <MSBuild Projects="SampleSSO.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="SampleSSO:Make" DependsOnTargets="SampleSSORT:Make">
+        <MSBuild Projects="SampleSSO.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="VersioningRT">
+        <MSBuild Projects="..\Versioning\RT\VersioningRT.dproj"/>
+    </Target>
+    <Target Name="VersioningRT:Clean">
+        <MSBuild Projects="..\Versioning\RT\VersioningRT.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="VersioningRT:Make">
+        <MSBuild Projects="..\Versioning\RT\VersioningRT.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Versioning" DependsOnTargets="VersioningRT">
+        <MSBuild Projects="..\Versioning\prj\Source\Versioning.dproj"/>
+    </Target>
+    <Target Name="Versioning:Clean" DependsOnTargets="VersioningRT:Clean">
+        <MSBuild Projects="..\Versioning\prj\Source\Versioning.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Versioning:Make" DependsOnTargets="VersioningRT:Make">
+        <MSBuild Projects="..\Versioning\prj\Source\Versioning.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="SampleSSORT;SampleSSO;VersioningRT;Versioning"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="SampleSSORT:Clean;SampleSSO:Clean;VersioningRT:Clean;Versioning:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="SampleSSORT:Make;SampleSSO:Make;VersioningRT:Make;Versioning:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

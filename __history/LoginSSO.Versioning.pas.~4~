@@ -1,0 +1,43 @@
+unit LoginSSO.Versioning;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, LoginSSO.User.Information;
+
+type
+  TfrmVersioning = class(TForm)
+    edtQuery: TEdit;
+    btnSaveQuery: TButton;
+    btnExecuteQueries: TButton;
+    lblUser: TLabel;
+    lblUserName: TLabel;
+  private
+    { Private declarations }
+    FUserInfo: TSSOUserInformationModel;
+
+    procedure SetUserInfo(AUserInfo: TSSOUserInformationModel);
+  public
+    { Public declarations }
+
+    property UserInfo: TSSOUserInformationModel read FUserInfo write SetUserInfo;
+  end;
+
+var
+  frmVersioning: TfrmVersioning;
+
+implementation
+
+{$R *.dfm}
+
+{ TfrmVersioning }
+
+procedure TfrmVersioning.SetUserInfo(AUserInfo: TSSOUserInformationModel);
+begin
+  UserInfo := AUserInfo;
+
+  lblUserName.Caption := UserInfo.DisplayName + ' ' + UserInfo.Surname;
+end;
+
+end.
